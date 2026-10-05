@@ -725,74 +725,74 @@ private:
         std::string pid = devices[selectedDeviceIdx].second.second;
         AddLog("[+] Starting Spoofing with VID: " + vid + " & PID: " + pid);
 
-        std::thread([this, vid, pid]() {
+        std::thread([this, vid, pid]() 
+            {
             std::string dummy_out;
 
+            // Dimiourgia tou fakelou includes an den uparxei
+            exec_silent("mkdir includes >nul 2>nul", dummy_out);
+
             AddLog("[*] Checking arduino-cli...");
-            if (!fileExists("arduino-cli.exe")) 
-            {
-                AddLog("[!] arduino-cli not found. Downloading...");
-                int rc = exec_silent("powershell -Command \"Invoke-WebRequest -Uri 'https://downloads.arduino.cc/arduino-cli/arduino-cli_latest_Windows_64bit.zip' -OutFile 'cli.zip'; Expand-Archive cli.zip -DestinationPath . -Force; Remove-Item cli.zip\"", dummy_out);
-                if (rc != 0 || !fileExists("arduino-cli.exe")) 
-                {
+            if (!fileExists("includes\\arduino-cli.exe")) {
+                AddLog("[!] arduino-cli not found. Downloading to includes folder...");
+                // Katevasma kai extract kateutheian mesa sto includes
+                int rc = exec_silent("powershell -Command \"Invoke-WebRequest -Uri 'https://downloads.arduino.cc/arduino-cli/arduino-cli_latest_Windows_64bit.zip' -OutFile 'includes\\cli.zip'; Expand-Archive includes\\cli.zip -DestinationPath includes -Force; Remove-Item includes\\cli.zip\"", dummy_out);
+                if (rc != 0 || !fileExists("includes\\arduino-cli.exe")) {
                     HandleError("Failed to download arduino-cli.");
                     return;
                 }
             }
 
             AddLog("[*] Creating Sketch files...");
-            exec_silent("mkdir MousePassThrough >nul 2>nul", dummy_out);
+            exec_silent("mkdir includes\\MousePassThrough >nul 2>nul", dummy_out);
             {
-                std::ofstream ino("MousePassThrough/MousePassThrough.ino");
+                // To arxeio swzetai pleon mesa sto includes/MousePassThrough
+                std::ofstream ino("includes/MousePassThrough/MousePassThrough.ino");
                 ino << SKETCH;
             }
 
             AddLog("[*] Updating libraries (This might take a moment)...");
-            exec_silent("arduino-cli core update-index >nul 2>nul", dummy_out);
-            exec_silent("arduino-cli core install arduino:avr >nul 2>nul", dummy_out);
-            exec_silent("arduino-cli lib install \"USB Host Shield Library 2.0\" >nul 2>nul", dummy_out);
+            // Oles oi entoles trexoun pleon apo to includes\arduino-cli.exe
+            exec_silent("includes\\arduino-cli.exe core update-index >nul 2>nul", dummy_out);
+            exec_silent("includes\\arduino-cli.exe core install arduino:avr >nul 2>nul", dummy_out);
+            exec_silent("includes\\arduino-cli.exe lib install \"USB Host Shield Library 2.0\" >nul 2>nul", dummy_out);
 
             AddLog("[*] Searching for Arduino Leonardo...");
-            std::string boardList = run_logged("arduino-cli board list");
+            std::string boardList = run_logged("includes\\arduino-cli.exe board list");
             std::regex comRegex("(COM[0-9]+).*(Leonardo|2341:8036)");
             std::smatch match;
-
-            if (!std::regex_search(boardList, match, comRegex)) 
-            {
+            if (!std::regex_search(boardList, match, comRegex)) {
                 HandleError("Arduino Leonardo not found. (Hint: Double-tap RESET on the board)");
                 return;
             }
-
             std::string comPort = match[1].str();
             AddLog("[+] Leonardo found on port " + comPort);
 
             AddLog("[*] Compiling (Applying Spoof & Disabling COM Port)...");
-            std::string compileCmd = "arduino-cli compile --fqbn arduino:avr:leonardo "
+            std::string compileCmd = "includes\\arduino-cli.exe compile --fqbn arduino:avr:leonardo "
                 "--build-property \"build.vid=0x" + vid + "\" "
                 "--build-property \"build.pid=0x" + pid + "\" "
                 "--build-property \"build.extra_flags=-DCDC_DISABLED\" "
-                "MousePassThrough";
+                "includes\\MousePassThrough";
 
-            if (exec_silent(compileCmd, dummy_out) != 0) 
-            {
+            if (exec_silent(compileCmd, dummy_out) != 0) {
                 HandleError("Compilation failed.");
                 return;
             }
 
             AddLog("[*] Compile OK! Uploading to " + comPort + "...");
-            std::string uploadCmd = "arduino-cli upload -p " + comPort + " --fqbn arduino:avr:leonardo MousePassThrough";
+            std::string uploadCmd = "includes\\arduino-cli.exe upload -p " + comPort + " --fqbn arduino:avr:leonardo includes\\MousePassThrough";
 
-            if (exec_silent(uploadCmd, dummy_out) != 0) 
-            {
+            if (exec_silent(uploadCmd, dummy_out) != 0) {
                 HandleError("Upload failed. Double-tap RESET on the board and try again.");
                 return;
             }
 
-            AddLog("[+++] SUCCESS! Board is now SPOOFED (" + vid + ":" + pid + ") and HID-Only (No COM).");
-            AddLog("[Info] Plug the mouse into the Host Shield and you are ready. Now you can use the software your provider sent you.");
+            AddLog("[+++] SUCCESS! Leonardo is now SPOOFED (" + vid + ":" + pid + ") and HID-Only (No COM).");
+            AddLog("[Info] Plug the mouse into the Host Shield and you are ready.");
             currentState = State::Success;
 
-            }).detach();
+         }).detach();
     }
 };
 
@@ -828,6 +828,7 @@ int main(int, char**)
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.IniFilename = nullptr;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 
